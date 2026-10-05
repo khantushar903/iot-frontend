@@ -181,7 +181,7 @@ function MetricCard({
 }
 
 export default function Page() {
-  const [readings, setReadings] = useState<Reading[]>(demo);
+  const [readings, setReadings] = useState<Reading[]>([]);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [connected, setConnected] = useState(false);
   const [lastAlert, setLastAlert] = useState<AlertItem | null>(null);
@@ -285,11 +285,11 @@ export default function Page() {
     return bestPeriod ? (10 / bestPeriod).toFixed(2) : "0.00";
   }, [readings]);
   const health =
-    current && current.magnitude && current.magnitude > 11
-      ? ["Zone D: Critical Unbalance", "health-critical"]
-      : current && current.magnitude && current.magnitude > 10
-        ? ["Zone C: Warning", "health-warning"]
-        : ["Zone A: Good", "health-good"];
+    current && current.magnitude && current.magnitude >= 5.0
+      ? ["Critical Vibration", "health-critical"]
+      : current && current.magnitude && current.magnitude >= 2.0
+        ? ["Warning", "health-warning"]
+        : ["Normal", "health-good"];
   const maxTemp = current?.temp_c ?? 0;
 
   return (
@@ -332,7 +332,7 @@ export default function Page() {
           </div>
           <div className={`health-badge ${health[1]}`}>
             <span className="health-dot" />
-            ISO 10816 <strong>{health[0]}</strong>
+            STATUS: <strong>{health[0]}</strong>
           </div>
         </div>
         {lastAlert && (
@@ -381,7 +381,7 @@ export default function Page() {
           </MetricCard>
           <MetricCard
             icon={Thermometer}
-            title="MOTOR TEMPERATURE"
+            title="MPU6050 INTERNAL TEMP"
             accent="orange"
             footer={
               <>
@@ -542,7 +542,7 @@ export default function Page() {
         <Panel className="alerts-panel">
           <div className="panel-heading">
             <div>
-              <Label>EVENT STREAM / ISO 10816</Label>
+              <Label>EVENT STREAM</Label>
               <h2>System event &amp; alarm log</h2>
             </div>
             <div className="log-status">
