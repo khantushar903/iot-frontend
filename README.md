@@ -1,6 +1,6 @@
 # Industrial IoT Motor Telemetry Dashboard (Next.js Frontend)
 
-A real-time condition-monitoring dashboard for industrial motors. It ingests live telemetry over WebSockets (3-axis vibration + temperature), renders an oscilloscope-style signal viewer and thermal trend, derives ISO 10816 machine-health severity, and surfaces an alert log — all in a single responsive screen.
+A real-time condition-monitoring dashboard for industrial motors. It ingests live telemetry over WebSockets (3-axis vibration + temperature), renders an oscilloscope-style signal viewer and thermal trend, derives vibration severity from a gravity-removed RMS, and surfaces an alert log — all in a single responsive screen.
 
 ## Tech Stack
 
@@ -18,8 +18,8 @@ A real-time condition-monitoring dashboard for industrial motors. It ingests liv
 - **Real-time WebSocket stream ingestion** — connects to the backend telemetry channel with automatic reconnection and a live/idle stream-state badge.
 - **3-axis vibration oscilloscope** — live X/Y/Z acceleration line chart built on a sliding window buffer.
 - **Thermal trend monitoring** — continuous motor temperature chart with per-sample tooltips.
-- **Dynamic ISO 10816 machine health severity badges** — maps vibration magnitude to Zones A–D (Good / Warning / Critical Unbalance).
-- **Active alert logs** — real-time event table (WARNING / CRITICAL) with timestamp, device, metric, value/threshold, and message.
+- **Dynamic severity badges** — maps the gravity-removed acceleration RMS to Normal / Warning / Critical.
+- **Active alert logs** — real-time event table (WARNING / CRITICAL / RESOLVED) with timestamp, device, metric, value/threshold, and message.
 
 ## Quickstart
 

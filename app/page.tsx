@@ -6,12 +6,12 @@ import {
   AlertTriangle,
   Bell,
   Cable,
+  CheckCircle2,
   Cpu,
   Gauge,
   Radio,
   Thermometer,
   Wifi,
-  WifiOff,
   Zap,
 } from "lucide-react";
 import {
@@ -33,39 +33,57 @@ type Reading = {
   magnitude?: number;
 };
 type AlertItem = {
-  severity: "CRITICAL" | "WARNING";
+  device_id: string;
+  severity: "CRITICAL" | "WARNING" | "RESOLVED";
   metric: string;
   value: number;
   threshold: number;
   message: string;
   created_at: string;
-  device_id?: string;
 };
 
 const WS_URL =
   process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/telemetry";
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-const demoStart = new Date("2026-08-28T15:45:00.000Z");
-const demo: Reading[] = Array.from({ length: 18 }, (_, i) => {
-  const t = new Date(demoStart.getTime() + i * 60000);
-  const x = 0.18 + Math.sin(i * 0.8) * 0.08;
-  const y = -0.35 + Math.cos(i * 0.6) * 0.11;
-  const z = 9.72 + Math.sin(i * 0.45) * 0.06;
-  return {
-    device_id: "esp32_node",
-    accel_x: x,
-    accel_y: y,
-    accel_z: z,
-    temp_c: 31.2 + Math.sin(i / 3) * 1.3,
-    created_at: t.toISOString(),
-    magnitude: Math.sqrt(x * x + y * y + z * z),
-  };
-});
 
+// Raw 3-axis magnitude. This still contains gravity (about 9.81 m/s^2 on
+// whichever axis the board is mounted on), so it is only meaningful as a
+// trend, never compared against an absolute severity threshold.
 function magnitude(r: Reading) {
   return Math.sqrt(r.accel_x ** 2 + r.accel_y ** 2 + r.accel_z ** 2);
 }
+
+// Resultant acceleration RMS over the buffered readings, mirroring the backend
+// method: remove each axis's DC component (which is gravity plus any constant
+// bias) and then take the root mean square of the resultant.
+//
+// This is a coarse client-side estimate over the readings the browser happens
+// to hold, not the authoritative metric - the backend analyses a proper
+// window at the true device sample rate. It exists so the badge does not sit
+// at a constant ~9.81 m/s^2 reading gravity and claim the motor is critical.
+function acResultantRms(readings: Reading[]): number {
+  if (readings.length === 0) return 0;
+  if (readings.length < 2) {
+    const r = readings[0];
+    return magnitude(r);
+  }
+  const mean = readings.reduce(
+    (acc, r) => ({
+      x: acc.x + r.accel_x / readings.length,
+      y: acc.y + r.accel_y / readings.length,
+      z: acc.z + r.accel_z / readings.length,
+    }),
+    { x: 0, y: 0, z: 0 },
+  );
+  const sum =
+    readings.reduce((acc, r) => {
+      const x = r.accel_x - mean.x;
+      const y = r.accel_y - mean.y;
+      const z = r.accel_z - mean.z;
+      return acc + x * x + y * y + z * z;
+    }, 0) / readings.length;
+  return Math.sqrt(sum);
+}
+
 function toDate(value: string | number): Date {
   if (typeof value === "number") return new Date(value);
   const n = Number(value);
@@ -189,10 +207,8 @@ export default function Page() {
   const socket = useRef<WebSocket | null>(null);
   const reconnect = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastFrame = useRef<number | null>(null);
 
   const markLive = () => {
-    lastFrame.current = Date.now();
     setStreamLive(true);
     if (idleTimer.current) clearTimeout(idleTimer.current);
     idleTimer.current = setTimeout(() => setStreamLive(false), 3000);
@@ -284,10 +300,17 @@ export default function Page() {
     }
     return bestPeriod ? (10 / bestPeriod).toFixed(2) : "0.00";
   }, [readings]);
+  // Gravity-removed RMS drives severity. `vibMag` (raw magnitude) does not:
+  // it sits at roughly 9.81 m/s^2 whenever the motor is stationary, so
+  // thresholding it marks an idle motor as critical.
+  const vibRms = useMemo(() => acResultantRms(readings), [readings]);
+  const vibMag = current ? magnitude(current) : 0;
+  const WARNING_RMS = 2.0;
+  const CRITICAL_RMS = 5.0;
   const health =
-    current && current.magnitude && current.magnitude >= 5.0
+    vibRms >= CRITICAL_RMS
       ? ["Critical Vibration", "health-critical"]
-      : current && current.magnitude && current.magnitude >= 2.0
+      : vibRms >= WARNING_RMS
         ? ["Warning", "health-warning"]
         : ["Normal", "health-good"];
   const maxTemp = current?.temp_c ?? 0;
@@ -337,11 +360,19 @@ export default function Page() {
         </div>
         {lastAlert && (
           <div
-            className={`alert-banner ${lastAlert.severity === "CRITICAL" ? "critical" : ""}`}
+            className={`alert-banner ${lastAlert.severity === "CRITICAL" ? "critical" : ""} ${lastAlert.severity === "RESOLVED" ? "resolved" : ""}`}
           >
-            <AlertTriangle size={20} />
+            {lastAlert.severity === "RESOLVED" ? (
+              <CheckCircle2 size={20} />
+            ) : (
+              <AlertTriangle size={20} />
+            )}
             <div>
-              <Label>{lastAlert.severity} EVENT DETECTED</Label>
+              <Label>
+                {lastAlert.severity === "RESOLVED"
+                  ? "CONDITION RESOLVED"
+                  : `${lastAlert.severity} EVENT DETECTED`}
+              </Label>
               <p>{lastAlert.message}</p>
             </div>
             <button
@@ -355,18 +386,22 @@ export default function Page() {
         <div className="metrics-grid">
           <MetricCard
             icon={Gauge}
-            title="TOTAL VIBRATION ACCELERATION"
+            title="VIBRATION ACCELERATION RMS"
             accent="cyan"
-            footer={
-              <>
-                <span>RMS VECTOR</span>
-                <strong>{current?.magnitude?.toFixed(2)} m/s²</strong>
-              </>
-            }
-          >
-            <div className="metric-number">
-              {current?.magnitude?.toFixed(2)} <small>m/s²</small>
-            </div>
+footer={
+  <>
+    <span>RAW MAGNITUDE (INCL. GRAVITY)</span>
+    <strong>{vibMag.toFixed(2)} m/s²</strong>
+  </>
+}
+>
+  <div className="metric-number">
+    {vibRms.toFixed(2)} <small>m/s²</small>
+  </div>
+            <p className="metric-note">
+              RMS over the last {readings.length} samples, gravity removed. Raw
+              3-axis magnitude is {vibMag.toFixed(2)} m/s².
+            </p>
             <div className="axis-values">
               <span>
                 X <b>{current?.accel_x.toFixed(2)}</b>

@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Industrial Motor Health & Telemetry Dashboard",
   description:
-    "Real-time vibration, temperature, and ISO 10816 machine health monitoring.",
+    "Real-time vibration, temperature, and machine health monitoring.",
   generator: "v0.app",
 };
 
