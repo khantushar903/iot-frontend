@@ -13,7 +13,7 @@ This marks the end of active development on the **Industrial IoT Motor Telemetry
   - REST API (`/api/v1`) for telemetry retrieval and control.
   - WebSocket endpoint (`/ws/telemetry`) streaming `snapshot`, `telemetry`, and `alert` frames.
   - Vibration/temperature ingestion from the sensor gateway.
-  - Background processing via **Celery** (threshold detection, alert generation, persistence).
+  - Background processing via **Celery** (signal analysis, alert lifecycle, persistence).
   - Storage in **Postgres** with **Redis** used for caching / queueing / pub-sub.
 
 ### iot-frontend — Next.js, Recharts, WebSockets
@@ -21,7 +21,7 @@ This marks the end of active development on the **Industrial IoT Motor Telemetry
 - **Status:** 100% complete, verified, frozen.
 - **Responsibilities:**
   - Real-time telemetry dashboard with a 3-axis vibration oscilloscope and thermal trend.
-  - ISO 10816 machine-health severity badges (Zones A–D).
+  - Severity badges (Normal / Warning / Critical) driven by the gravity-removed acceleration RMS.
   - Live alert log with dismissible alert banner.
   - WebSocket lifecycle management (auto-reconnect, live/idle detection).
   - 30-reading sliding window buffer for chart performance.

@@ -27,9 +27,9 @@ The dashboard is implemented as a single page (`app/page.tsx`) with a set of sma
 ### Page sections (`app/page.tsx`)
 
 1. **Header** — brand lockup, live/idle stream badge, active device chip, connection status.
-2. **Overview row** — "LIVE SYSTEM OVERVIEW" label, interval copy, and the ISO 10816 health badge.
+2. **Overview row** — "LIVE SYSTEM OVERVIEW" label, interval copy, and the severity health badge (driven by `vibRms`, the gravity-removed RMS).
 3. **Alert banner** — dismissible banner for the most recent alert.
-4. **Metrics grid** — four `MetricCard` KPIs: Total Vibration Acceleration, Motor Temperature, Peak Vibration Frequency, Active System Alerts.
+4. **Metrics grid** — four `MetricCard` KPIs: Vibration Acceleration RMS, MPU6050 Internal Temp, Peak Vibration Frequency, Active System Alerts.
 5. **Charts grid** — the 3-axis acceleration oscilloscope and the temperature trend, both Recharts `LineChart`s.
 6. **Alerts panel** — a table of warning/critical events.
 7. **Footer** — last-sample timestamp and socket link status.
@@ -45,8 +45,9 @@ There are two common additions: a new **KPI card** in the metrics grid, and a ne
 Pick a value derived from `readings` (computed after `current` / `peak` / `maxTemp`), then add a `MetricCard`:
 
 ```tsx
-const rms = current ? magnitude(current) : 0;
-// or any other derived value, e.g. const xRms = current?.accel_x ?? 0;
+// `vibRms` is the gravity-removed resultant RMS that drives severity.
+// `vibMag` is the raw magnitude and still contains gravity.
+const rms = vibRms;
 
 <MetricCard
   icon={Zap}
@@ -73,7 +74,7 @@ Steps:
 
 ### 2. Adding a new Recharts series
 
-To plot an extra line (e.g., RMS velocity or a derived axis) on the oscilloscope:
+To plot an extra line (e.g., the RMS-trend series or a derived axis) on the oscilloscope:
 
 ```tsx
 // ensure a value is computed in chartData

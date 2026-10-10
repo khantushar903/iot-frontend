@@ -219,6 +219,14 @@ button {
   border-color: #79343d;
   background: #250f12;
 }
+.alert-banner.resolved {
+  color: var(--green);
+  border-color: #2b604b;
+  background: #0d211a;
+}
+.alert-banner.resolved p {
+  color: #a9c9bb;
+}
 .alert-banner p {
   margin: 4px 0 0;
   color: #d9d4a4;
@@ -429,6 +437,10 @@ tr:last-child td {
 .severity.critical {
   color: var(--red);
   background: #38151a;
+}
+.severity.resolved {
+  color: var(--green);
+  background: #10251d;
 }
 .empty-state {
   display: flex;

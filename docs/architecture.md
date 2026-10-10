@@ -48,7 +48,7 @@ Charts stay performant by rendering a bounded window rather than an unbounded hi
 - `current` — the newest reading (`readings[readings.length - 1]`); drives all KPI cards.
 - `chartData` — `readings` mapped into chart-ready objects, adding `rawTime` (the raw timestamp used as the x-axis key) and a guaranteed `magnitude`.
 - `peak` (`useMemo`) — a lightweight spectral estimate. It scans candidate periods (2–8 samples), scores each by the summed deltas between samples one period apart, and returns `10 / bestPeriod` Hz. Recomputed only when `readings` changes.
-- `health` — the ISO 10816 severity tuple (`[label, cssClass]`).
+- `health` — the severity tuple (`[label, cssClass]`) derived from the gravity-removed RMS.
 - `maxTemp` — current temperature used for the temperature card.
 
 ## WebSocket Contract Lifecycle
@@ -97,14 +97,18 @@ Formatting:
 | Chart x-axis | `timeLabel` | `HH:mm` (e.g., `23:43`) |
 | Chart tooltips / footer / alert log | `fullTimeLabel` | `Aug 27, 2026, 11:43 PM` |
 
-### ISO 10816 threshold mapping
+### Severity thresholds
 
-Machine health is derived from the total vibration magnitude (RMS vector `√(x² + y² + z²)`):
+The health badge is driven by `acResultantRms(readings)` — the resultant acceleration RMS after each axis's DC component has been removed — matching the backend's method:
 
-| Magnitude threshold | Zone | Severity label | CSS class |
-|---------------------|------|----------------|-----------|
-| `> 11` m/s² | D | `Zone D: Critical Unbalance` | `health-critical` |
-| `> 10` m/s² | C | `Zone C: Warning` | `health-warning` |
-| `≤ 10` m/s² | A | `Zone A: Good` | `health-good` |
+| RMS threshold | Severity label | CSS class |
+|---------------|----------------|-----------|
+| `≥ 5.0` m/s² | `Critical Vibration` | `health-critical` |
+| `≥ 2.0` m/s² | `Warning` | `health-warning` |
+| `< 2.0` m/s² | `Normal` | `health-good` |
 
-The magnitude is recomputed on every ingested frame via `magnitude(r)` (`√(accel_x² + accel_y² + accel_z²)`), so the health badge always reflects the most recent sample.
+**Why not the raw magnitude.** `magnitude(r)` (`√(x² + y² + z²)`) still contains gravity, so it sits at roughly 9.81 m/s² whenever the motor is stationary. Thresholding it marks an idle motor as critical — which is exactly what the previous implementation did, since it compared `vibMag` against the same 5.0/2.0 levels. `magnitude()` is still used for the trend chart, where a DC offset is harmless and expected.
+
+This badge is a coarse client-side estimate over the readings the browser happens to hold, not the authoritative metric: the backend analyses a proper 512-sample window at the true device sample rate and owns the alert lifecycle. They are computed independently, so a badge reading and a server alert can legitimately disagree in edge cases.
+
+These thresholds are **project-defined**, matching the backend. The dashboard does not claim ISO 10816/20816 conformance.
